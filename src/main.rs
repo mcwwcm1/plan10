@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::io::{stdin, stdout, Write};
-use std::net::{UdpSocket, SocketAddr};
 use std::sync::mpsc::{channel, Receiver, Sender};
-use std::thread;
+use std::net::SocketAddr;
+use tokio::net::UdpSocket;
 use futures::join;
 use tokio;
 
@@ -31,7 +31,7 @@ async fn server_actor() {
     let (_tx, _rx): (Sender<i32>, Receiver<i32>) = channel();
 
     println!("Opening receiver socket...");
-    let socket = UdpSocket::bind("127.0.0.1:15076").expect("Couldn't bind to address");
+    let socket = UdpSocket::bind("127.0.0.1:15076").await.expect("Couldn't bind to address");
 
     let mut buf = [0; 100];
 
@@ -39,7 +39,7 @@ async fn server_actor() {
 
     loop {
         println!("Awaiting packets...");
-        let (amt, src) = socket.recv_from(&mut buf).expect("Didn't receive data");
+        let (amt, src) = socket.recv_from(&mut buf).await.expect("Didn't receive data");
         let msg = String::from_utf8_lossy(&buf[..amt]); // Should probably handle errors rather than using the lossy method
 
         match &msg[..3] {
@@ -48,9 +48,15 @@ async fn server_actor() {
                 println!("Registered client: {name}");
                 clients.insert(src, name);
             }
-            "msg" => println!("[{}] {}", clients[&src], msg[4..].to_string()),
+            "msg" => { 
+                let formatted_message = format!("[{}] {}", clients[&src], msg[4..].to_string());
+                println!("{formatted_message}");
+                for (adr, _nam) in &clients {
+                    socket.send_to(formatted_message.as_bytes() , &adr).await.expect("Couldn't send message");
+                }
+            },
             "ech" => { socket
-                        .send_to(msg[4..].as_bytes(), src)
+                        .send_to(msg[4..].as_bytes(), src).await
                         .expect("Couldn't send message"); },
             _ => println!("Unrecognized command: {msg}"),
         }
@@ -70,17 +76,17 @@ async fn client_actor() {
         .read_line(&mut username)
         .expect("Did not enter a correct string");
 
-    println!("Opening sender socket...");
-    let addrs = [
-    SocketAddr::from(([127, 0, 0, 1], 15070)),
-    SocketAddr::from(([127, 0, 0, 1], 15071)),
-];
-    let socket = UdpSocket::bind(&addrs[..]).expect("couldn't bind to address");
+        println!("Opening sender socket...");
+        let addrs = [
+        SocketAddr::from(([127, 0, 0, 1], 15070)),
+        SocketAddr::from(([127, 0, 0, 1], 15071)),
+    ];
+    let socket = UdpSocket::bind(&addrs[..]).await.expect("couldn't bind to address");
 
     let mut reg_command = "reg ".to_string();
     reg_command.push_str(&username.trim());
     socket
-        .send_to(reg_command.as_bytes(), "127.0.0.1:15076")
+        .send_to(reg_command.as_bytes(), "127.0.0.1:15076").await
         .expect("Couldn't send message");
 
     join!(message_sender_service(&socket), receive_packet_service(&socket));
@@ -91,13 +97,17 @@ async fn message_sender_service(socket: &UdpSocket) {
         print!(">  ");
         stdout().flush().expect("Flush failed.");
 
-        let mut input = String::new();
-        stdin()
-            .read_line(&mut input)
-            .expect("Did not enter a correct string");
+        let input = tokio::task::spawn_blocking(|| {
+            let mut input = String::new();
+            stdin()
+                .read_line(&mut input)
+                .expect("Did not enter a correct string");
+
+            input
+        }).await.unwrap();
         
         socket
-            .send_to(&input.as_bytes(), "127.0.0.1:15076")
+            .send_to(&input.as_bytes(), "127.0.0.1:15076").await
             .expect("Couldn't send message");
     }
 }
@@ -105,7 +115,7 @@ async fn message_sender_service(socket: &UdpSocket) {
 async fn receive_packet_service(socket: &UdpSocket) {
     loop {
         let mut buf : [u8; 100] = [0; 100];
-        let (amt, src) = socket.recv_from(&mut buf).expect("Didn't receive data");
+        let (amt, src) = socket.recv_from(&mut buf).await.expect("Didn't receive data");
         println!("[{src}] {}", String::from_utf8_lossy(&buf[..amt]));
     }
 }
