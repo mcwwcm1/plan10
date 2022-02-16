@@ -2,8 +2,8 @@
 From virtual space
 
 ## Current Stack Idea
-* Postgresql
-    * https://www.postgresql.org/
+* CassandraDB
+    * https://cassandra.apache.org/_/index.html
 * WebAssembly
     * https://webassembly.github.io/spec/core/intro/index.html
 * Zstd Compression
