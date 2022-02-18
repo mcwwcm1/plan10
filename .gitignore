@@ -1,0 +1,11 @@
+## Rust ##
+target/
+
+## IDEs ##
+# VsCode
+.vs/
+# Idea
+.idea/
+
+## Runtime ##
+.env
