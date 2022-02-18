@@ -1,0 +1,10 @@
+[package]
+name = "plan10"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bytes = "1.1.0"
+tokio = { version = "1.16.1", features = ["rt-multi-thread", "time", "sync", "net", "io-util"] }
+tracing = "0.1.31"
+tracing-subscriber = "0.3.9"
