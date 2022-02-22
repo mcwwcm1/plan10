@@ -1,3 +1,5 @@
+///! How it works: https://en.wikipedia.org/wiki/LEB128
+
 use bytes::{Buf, BufMut};
 use nom::Needed;
 use std::cmp::min;
@@ -58,7 +60,7 @@ mod tests {
     #[test]
     fn encode_test_len() {
         let mut buffer = BytesMut::new();
-        encode_leb128(0x7FFF_FFFF_FFFF_FFFF, &mut buffer);
+        encode_leb128(0xFFF_FFFF_FFFF_FFFF, &mut buffer);
         assert_eq!(buffer.len(), 9);
     }
 
